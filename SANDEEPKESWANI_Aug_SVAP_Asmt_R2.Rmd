@@ -60,7 +60,7 @@ We will look into following questions
 -Find out the top 3 polluting states in 2015  
 -Analysis the trend for these top polluting states over the years since 1990  
 -Analysis the trend for Bangalore as well over the past years  
--Predict the pollution levels for one of these top states for coming Diwali 
+-Predict the pollution levels for one of these top states for coming Diwali and winter months 
 
 ```{r}
 library(rvest)
