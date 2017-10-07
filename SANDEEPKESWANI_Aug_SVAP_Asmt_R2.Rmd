@@ -53,10 +53,10 @@ Here are the permissible limits for these parameters https://www.dpcc.delhigovt.
     + 120 for Industrial area  
     + 50 for Sensitive area  
 * PM 2.5  
-    + 10 annual average  
+    + 60 micrograms/cubic metre limit prescribed in the National Ambient Air Quality Standards of the Central Pollution Control Board  
 
 #Frame
-We will ans following questions  
+We will look into following questions 
 -Find out the top 3 polluting states in 2015  
 -Analysis the trend for these top polluting states over the years since 1990  
 -Analysis the trend for Bangalore as well over the past years  
@@ -97,14 +97,11 @@ We are doing following here
     * Correcting the two spelling for Yamuna Nagar,Yamunanagar to Yamunanagar   
 4. Missing Value Treatment
     * Removing data for states "andaman-and-nicobar-islands", "Lakshadweep","Tripura" as only NA is there  
-    * Removing column for PM2.5 as most of data is NA for this column
  
 ```{r}
 #Converting the date object to R date
 airquality$date=as.Date(airquality$date,'%Y-%m-%d')
 summary(airquality)
-#Removing column for PM2.5 as most of data is NA for this column
-airquality <- airquality[ -c(12) ]
 #Making the type generic to 3 only which are Sensitive Area,Industrial Area and Residential and others
 airquality$type[airquality$type %in% c("Sensitive","Sensitive Areas")]="Sensitive Area"
 airquality$type[airquality$type %in% c("Industrial","Industrial Areas")] <-"Industrial Area"
@@ -130,16 +127,18 @@ airquality$month=month(airquality$date)
 #As delhi comes in all of these top list lets analysis trend in delhi separately
 by_state_wise_2015 =airquality%>%filter(date>'2015-01-01')%>%group_by(state)%>%summarise(Avg_So2=mean(so2,na.rm=TRUE),
                                                   Avg_No2=mean(no2,na.rm=TRUE),
+                                                  Avg_PM2_5=mean(pm2_5,na.rm=TRUE),
                                                   Avg_Rspm=mean(rspm,na.rm=TRUE),
                                                   Avg_Spm= mean(spm,na.rm=TRUE))
 ```
 
 ##Explore
+- We will not be plotting SPM as SPM is NA for 2015 data
 ```{r}
 ggplot(by_state_wise_2015,aes(x=state,y=Avg_So2,fill=Avg_So2)) +
    geom_bar(stat="identity")+
   theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
-  ggtitle("Average Sulphor DiOxide Content-State Wise for year 2015") +
+  ggtitle("Average Sulphor Dioxide Content-State Wise for year 2015") +
   xlab(label="State") +
   ylab(label="Average SO2 Content") +
   labs(caption="Source :Ministry of Environment and Forests and Central Pollution Control Board of India")
@@ -147,7 +146,7 @@ ggplot(by_state_wise_2015,aes(x=state,y=Avg_So2,fill=Avg_So2)) +
 ggplot(by_state_wise_2015,aes(x=state,y=Avg_No2,fill=Avg_No2)) +
   geom_bar(stat="identity") +
   theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
-  ggtitle("Average Nitrogen DiOxide Content-State Wise for 2015") +
+  ggtitle("Average Nitrogen Dioxide Content-State Wise for 2015") +
   xlab(label="State") +
   ylab(label="Average NO2 Content") +
   labs(caption="Source :Ministry of Environment and Forests and Central Pollution Control Board of India")
@@ -161,6 +160,14 @@ ggplot(by_state_wise_2015,aes(x=state,y=Avg_Rspm,fill=Avg_Rspm)) +
   xlab(label="State") +
   ylab(label="Average RSPM Content") +
   labs(caption="Source :Ministry of Environment and Forests and Central Pollution Control Board of India")
+
+ggplot(by_state_wise_2015,aes(x=state,y=Avg_PM2_5,fill=Avg_PM2_5)) +
+  geom_bar(stat="identity") +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+  ggtitle("Average PM 2.5 Content-State Wise for year 2015") +
+  xlab(label="State") +
+  ylab(label="Average PM 2.5 Content") +
+  labs(caption="Source :Ministry of Environment and Forests and Central Pollution Control Board of India")
 ```
 
 #Insight
@@ -168,9 +175,11 @@ ggplot(by_state_wise_2015,aes(x=state,y=Avg_Rspm,fill=Avg_Rspm)) +
 1. Delhi ranked highest in NO2,PM2.5 and RSPM so is the most polluted state all over  
 2. Haryana has highest Nitrogen Dioxide level  
 3. Mizoram is least polluted w.r.t. NO2,SO2 and RSPM.  
-4. Mizoram and Nagaland least polluted w.r.t. NO2 and SO2.  
-5. Delhi and Uttar Pradesh have highest levels of RSPM.  
-6. We will look at trends over the years for Delhi, Haryana, Uttar Pradesh as they seem to be top polluting states  
+4. SO2 levels across all states are within permissible limits of 60.  
+5. Mizoram and Nagaland least polluted w.r.t. NO2 and SO2.  
+6. Delhi and Uttar Pradesh have highest levels of RSPM. 
+7. Air pollution of north Indian states is much more than that of South Indian states.
+8. We will look at trends over the years for Delhi, Haryana, Uttar Pradesh as they seem to be top polluting states  
 
 
 ####As seen from above plots, we will be analysising the trends of following states
@@ -214,7 +223,7 @@ ggplot(bang_Year_Wise.long, aes(x=year, y=value, colour=variable))+geom_line() +
 4. For Bangalore, SPM levels have increased over the period of time while SO2 and NO2 levels have remain more or less similar.
 
 #Predict  
-- We will predict the air pollution levels for Delhi for coming Diwali months  
+- We will predict the air pollution levels for Delhi for coming Diwali months as Delhi is the most polluted state in India  
 ```{r}
 
 Delhi_SO2 <-airquality%>%filter(state =='Delhi')%>%select(date,so2)
@@ -244,10 +253,18 @@ m_SPM=prophet(Delhi_SPM)
 future_SPM=make_future_dataframe(m_SPM,periods=700)
 forecast_SPM=predict(m_SPM,future_SPM)
 forecast_SPM=forecast_SPM%>%filter(ds > "2016-10-15")
-str(forecast_RSPM)
+
+Delhi_PM <-airquality%>%filter(state =='Delhi')%>%select(date,pm2_5)
+colnames(Delhi_PM)=c('ds','y')
+m_PM=prophet(Delhi_PM)
+future_PM=make_future_dataframe(m_PM,periods=700)
+forecast_PM=predict(m_PM,future_PM)
+forecast_PM=forecast_PM%>%filter(ds > "2016-10-15")
+
 forecast_RSPM$ds=as.Date(forecast_RSPM$ds)
 forecast$ds=as.Date(forecast$ds)
 forecast_SPM$ds=as.Date(forecast_SPM$ds)
+forecast_PM$ds=as.Date(forecast_PM$ds)
 forecast_no2$ds=as.Date(forecast_no2$ds)
 ggplot(data = forecast_RSPM, aes(x=ds, y=yhat))+geom_line(color='brown4') + ggtitle("Prediction of Delhi RSPM Content for Diwali 2017") +
   xlab(label="Date") +
@@ -255,15 +272,19 @@ ggplot(data = forecast_RSPM, aes(x=ds, y=yhat))+geom_line(color='brown4') + ggti
  
 ggplot(data = forecast_SPM, aes(x=ds, y=yhat))+geom_line(color='red3') + ggtitle("Prediction of Delhi SPM Content for Diwali 2017") +
   xlab(label="Date") +
-  ylab(label="Average SPM Content") +scale_x_date(date_labels="%b %y",date_breaks  ="1 month")
+  ylab(label="Average SPM Content") +scale_x_date(date_labels="%b %y",date_breaks  ="1 month")+theme(plot.title = element_text(hjust = 0.5))
 
 ggplot(data = forecast_no2, aes(x=ds, y=yhat))+geom_line(color='blue4') + ggtitle("Prediction of Delhi NO2 Content for Diwali 2017") +
   xlab(label="Date") +
-  ylab(label="Average NO2 Content") +scale_x_date(date_labels="%b %y",date_breaks  ="1 month")
+  ylab(label="Average NO2 Content") +scale_x_date(date_labels="%b %y",date_breaks  ="1 month") +theme(plot.title = element_text(hjust = 0.5))
 
 ggplot(data = forecast, aes(x=ds, y=yhat))+geom_line(color='darkorange3') + ggtitle("Prediction of Delhi RSPM Content for Diwali 2017") +
   xlab(label="Date") +
-  ylab(label="Average RSPM Content") +scale_x_date(date_labels="%b %y",date_breaks  ="1 month")
+  ylab(label="Average so2 Content") +scale_x_date(date_labels="%b %y",date_breaks  ="1 month") +theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(data = forecast_PM, aes(x=ds, y=yhat))+geom_line(color='red3') + ggtitle("Prediction of Delhi PM 2.5 Content for Diwali 2017") +
+  xlab(label="Date") +
+  ylab(label="Average PM 2.5 Content") +scale_x_date(date_labels="%b %y",date_breaks  ="1 month") +theme(plot.title = element_text(hjust = 0.5))
 
 
 ```
@@ -275,4 +296,5 @@ Following points from the prediction plots
 - RSPM levels for the period October-December 2017 in Delhi is 6 times than the permissible limit which is very dangeous  
 - SPM levels are aso very high more than 6 times the limit  
 - NO2 levels for the period October-December 2017 in Delhi are relatively better are just above the limit
-- SO2 levels well within the permissible limits
+- SO2 levels well within the permissible limits  
+- PM 2.5 is way above the limit of 60 micrograms/cubic metre limit prescribed in the National Ambient Air Quality Standards of the Central Pollution Control Board as much as 13 times of the limit.  
