@@ -1,0 +1,278 @@
+---
+title: "SVAP_Assignment_R2"
+author: "SandeepKeswani"
+date: "September 30, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+
+
+# Background
+The rate at which urban air pollution has grown across India is alarming. A vast majority of cities are caught in the toxic web as air quality fails to meet health-based standards. Almost all cities are reeling under severe particulate pollution while newer pollutants like oxides of nitrogen and air toxics have begun to add to the public health challenge. Only a few mega cities where action has started show some improvement in air quality but in most cases the particulate levels are still unacceptably high. But medium and small sized towns and cities are witnessing phenomenal spurt in pollution as severe as or more than any mega city. AIr pollution is more severe in winter months mainly from October to December and much more in North India then SOuth India. 
+
+
+We have air quality data from 1990 to 2015 for all states and cities from https://www.kaggle.com/shrutibhargava94/india-air-quality-data , we have following parameters in dataset  
+-stn-code  
+-sampling_date  
+-state  
+-location  
+-agency  
+-type  
+-so2  
+-no2  
+-rspm  
+-spm  
+-location_monitoring_station  
+-pm2_5  
+-date  
+
+Here are the permissible limits for these parameters https://www.dpcc.delhigovt.nic.in/airstd.htm  
+
+* SO2 Annual Average   
+    + 60 for Residential. Rural & other areas  
+    + 80 for Industrial area  
+    + 15 for Sensitive area  
+* NO2 Annual Average  
+    + 60 for Residential. Rural & other areas  
+    + 80 for Industrial area  
+    + 15 for Sensitive area  
+* SPM Annual Average
+    + 140 for Residential. Rural & other areas  
+    + 360 for Industrial area  
+    + 70 for Sensitive area  
+* RSPM Annual Average
+    + 60 for Residential. Rural & other areas  
+    + 120 for Industrial area  
+    + 50 for Sensitive area  
+* PM 2.5  
+    + 10 annual average  
+
+#Frame
+We will ans following questions  
+-Find out the top 3 polluting states in 2015  
+-Analysis the trend for these top polluting states over the years since 1990  
+-Analysis the trend for Bangalore as well over the past years  
+-Predict the pollution levels for one of these top states for coming Diwali 
+
+```{r}
+library(rvest)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(reshape2)
+library(lubridate)
+```
+
+#Acquire
+
+We Have downloaded data from https://www.kaggle.com/shrutibhargava94/india-air-quality-data
+```{r}
+setwd("C:/Users/sandeep/OneDrive/Documents/BigData/SVAPAssignment/R2Assignment")
+airquality=read.csv("data.csv")
+str(airquality)
+
+
+```
+
+#Refine
+--Quality and Consistency
+--Missing Value
+--Outlier
+--Remove unneeded variabes  
+
+We are doing following here  
+1. Converting the date column to R date
+2. As we have many values in column for type of area so we are reducing it to 3 types only which are Sensitive Area,Industrial Area and    Residential and others  
+3. Data Correction 
+    * Making the state as Punjab where city is Chandigarh  
+    * Correcting the two spelling for Bhubaneswar,Bhubaneshwar to Bhubaneswar  
+    * Correcting the two spelling for Yamuna Nagar,Yamunanagar to Yamunanagar   
+4. Missing Value Treatment
+    * Removing data for states "andaman-and-nicobar-islands", "Lakshadweep","Tripura" as only NA is there  
+    * Removing column for PM2.5 as most of data is NA for this column
+ 
+```{r}
+#Converting the date object to R date
+airquality$date=as.Date(airquality$date,'%Y-%m-%d')
+summary(airquality)
+#Removing column for PM2.5 as most of data is NA for this column
+airquality <- airquality[ -c(12) ]
+#Making the type generic to 3 only which are Sensitive Area,Industrial Area and Residential and others
+airquality$type[airquality$type %in% c("Sensitive","Sensitive Areas")]="Sensitive Area"
+airquality$type[airquality$type %in% c("Industrial","Industrial Areas")] <-"Industrial Area"
+airquality$type[airquality$type %in% c("Residential","Residential, Rural and other Areas","RIRUO")] <-"Residential and others"
+#Correcting the states and cities where there is multiple data
+airquality$state[airquality$location=='Chandigarh']='Punjab'
+unique(airquality$state)
+airquality$location[airquality$location=='Bhubaneshwar']='Bhubaneswar'
+airquality$location[airquality$location=='Yamuna Nagar']='Yamunanagar'
+#Removing un-needed data where only NA is there
+airquality=airquality%>%filter(!state %in% c("andaman-and-nicobar-islands", "Lakshadweep","Tripura"))
+
+
+```
+#Transform,Explore and Model 
+
+##Transform and Model
+```{r}
+airquality$date=as.POSIXct(airquality$date)
+airquality$year=year(airquality$date)
+airquality$month=month(airquality$date)
+#Find top polluting states in 2015 and then find out the trend for them from 1990 to 2015
+#As delhi comes in all of these top list lets analysis trend in delhi separately
+by_state_wise_2015 =airquality%>%filter(date>'2015-01-01')%>%group_by(state)%>%summarise(Avg_So2=mean(so2,na.rm=TRUE),
+                                                  Avg_No2=mean(no2,na.rm=TRUE),
+                                                  Avg_Rspm=mean(rspm,na.rm=TRUE),
+                                                  Avg_Spm= mean(spm,na.rm=TRUE))
+```
+
+##Explore
+```{r}
+ggplot(by_state_wise_2015,aes(x=state,y=Avg_So2,fill=Avg_So2)) +
+   geom_bar(stat="identity")+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+  ggtitle("Average Sulphor DiOxide Content-State Wise for year 2015") +
+  xlab(label="State") +
+  ylab(label="Average SO2 Content") +
+  labs(caption="Source :Ministry of Environment and Forests and Central Pollution Control Board of India")
+
+ggplot(by_state_wise_2015,aes(x=state,y=Avg_No2,fill=Avg_No2)) +
+  geom_bar(stat="identity") +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+  ggtitle("Average Nitrogen DiOxide Content-State Wise for 2015") +
+  xlab(label="State") +
+  ylab(label="Average NO2 Content") +
+  labs(caption="Source :Ministry of Environment and Forests and Central Pollution Control Board of India")
+
+
+
+ggplot(by_state_wise_2015,aes(x=state,y=Avg_Rspm,fill=Avg_Rspm)) +
+  geom_bar(stat="identity") +
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5)) +
+  ggtitle("Average RSPM Content-State Wise for year 2015") +
+  xlab(label="State") +
+  ylab(label="Average RSPM Content") +
+  labs(caption="Source :Ministry of Environment and Forests and Central Pollution Control Board of India")
+```
+
+#Insight
+####Key Takeaways from the plots
+1. Delhi ranked highest in NO2,PM2.5 and RSPM so is the most polluted state all over  
+2. Haryana has highest Nitrogen Dioxide level  
+3. Mizoram is least polluted w.r.t. NO2,SO2 and RSPM.  
+4. Mizoram and Nagaland least polluted w.r.t. NO2 and SO2.  
+5. Delhi and Uttar Pradesh have highest levels of RSPM.  
+6. We will look at trends over the years for Delhi, Haryana, Uttar Pradesh as they seem to be top polluting states  
+
+
+####As seen from above plots, we will be analysising the trends of following states
+* Delhi  
+* Haryana  
+* Uttar Pradesh  
+```{r}
+target=c("Delhi","Haryana","Uttar Pradesh")
+State_Year_Wise =airquality%>%filter(state %in% target)%>%group_by(state,year) %>%summarise(So2=mean(so2,na.rm=TRUE),
+                                               No2=mean(no2,na.rm=TRUE),
+                                               Rspm=mean(rspm,na.rm=TRUE),
+                                               spm=mean(spm,na.rm=TRUE))
+State_Year_Wise.long =melt(State_Year_Wise,id=c("year","state"),measure=c("So2","No2","Rspm","spm"),na.rm=TRUE)
+State_Year_Wise_RawData =airquality%>%filter(state %in% target)%>%group_by(state,year) %>%summarise(So2=mean(so2,na.rm=TRUE),
+                                               No2=mean(no2,na.rm=TRUE),
+                                               Rspm=mean(rspm,na.rm=TRUE),
+                                               spm=mean(spm,na.rm=TRUE))
+
+bang_Year_Wise=airquality%>%filter(location== 'Bangalore')%>%group_by(year) %>%summarise(So2=mean(so2,na.rm=TRUE),
+                                               No2=mean(no2,na.rm=TRUE),
+                                               Rspm=mean(rspm,na.rm=TRUE),
+                                               spm=mean(spm,na.rm=TRUE))
+
+bang_Year_Wise.long =melt(bang_Year_Wise,id=c("year"),measure=c("So2","No2","Rspm","spm"),na.rm=TRUE)
+
+ggplot(State_Year_Wise.long, aes(x=year, y=value, fill=variable))+geom_bar(stat='identity', position='dodge')+facet_wrap(~state)  +  ggtitle("Trend for top3 polluting states in 2015 over the years") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(State_Year_Wise.long, aes(x=year, y=value, colour=variable))+geom_line() +facet_wrap(~state)  +  ggtitle("Trend for Top 3 polluting states in 2015 over the years") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplot(bang_Year_Wise.long, aes(x=year, y=value, colour=variable))+geom_line() +  ggtitle("Trend for Bangalore over the years") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+#####As seen from the trends  
+
+1. NO2 and RSPM levels for Delhi has increased over time from 1990 levels while SO2 and SPM levels have come down.  
+2. For Haryana NO2 levels have increased while RSPM level have decreased by large extent in 2015.  
+3. In UP, there have been lot of variation in SPM but the average value in 2015 is more than 1990 while SO2 and NO2 levels have remain similar over the period.  
+4. For Bangalore, SPM levels have increased over the period of time while SO2 and NO2 levels have remain more or less similar.
+
+#Predict  
+- We will predict the air pollution levels for Delhi for coming Diwali months  
+```{r}
+
+Delhi_SO2 <-airquality%>%filter(state =='Delhi')%>%select(date,so2)
+colnames(Delhi_SO2)=c('ds','y')
+library(StanHeaders)
+library(prophet)
+m=prophet(Delhi_SO2)
+future=make_future_dataframe(m,periods=700)
+forecast=predict(m,future)
+forecast=forecast%>%filter(ds > "2016-10-15")
+Delhi_NO2 <-airquality%>%filter(state =='Delhi')%>%select(date,no2)
+colnames(Delhi_NO2)=c('ds','y')
+mno2=prophet(Delhi_NO2)
+future_no2=make_future_dataframe(m,periods=700)
+forecast_no2=predict(mno2,future_no2)
+forecast_no2=forecast_no2%>%filter(ds > "2016-10-15")
+Delhi_RSPM <-airquality%>%filter(state =='Delhi')%>%select(date,rspm)
+colnames(Delhi_RSPM)=c('ds','y')
+m_RSPM=prophet(Delhi_RSPM)
+future_RSPM=make_future_dataframe(m_RSPM,periods=700)
+forecast_RSPM=predict(m_RSPM,future_RSPM)
+forecast_RSPM=forecast_RSPM%>%filter(ds > "2016-10-15")
+
+Delhi_SPM <-airquality%>%filter(state =='Delhi')%>%select(date,spm)
+colnames(Delhi_SPM)=c('ds','y')
+m_SPM=prophet(Delhi_SPM)
+future_SPM=make_future_dataframe(m_SPM,periods=700)
+forecast_SPM=predict(m_SPM,future_SPM)
+forecast_SPM=forecast_SPM%>%filter(ds > "2016-10-15")
+str(forecast_RSPM)
+forecast_RSPM$ds=as.Date(forecast_RSPM$ds)
+forecast$ds=as.Date(forecast$ds)
+forecast_SPM$ds=as.Date(forecast_SPM$ds)
+forecast_no2$ds=as.Date(forecast_no2$ds)
+ggplot(data = forecast_RSPM, aes(x=ds, y=yhat))+geom_line(color='brown4') + ggtitle("Prediction of Delhi RSPM Content for Diwali 2017") +
+  xlab(label="Date") +
+  ylab(label="Average RSPM Content") +scale_x_date(date_labels="%b %y",date_breaks  ="1 month")
+ 
+ggplot(data = forecast_SPM, aes(x=ds, y=yhat))+geom_line(color='red3') + ggtitle("Prediction of Delhi SPM Content for Diwali 2017") +
+  xlab(label="Date") +
+  ylab(label="Average SPM Content") +scale_x_date(date_labels="%b %y",date_breaks  ="1 month")
+
+ggplot(data = forecast_no2, aes(x=ds, y=yhat))+geom_line(color='blue4') + ggtitle("Prediction of Delhi NO2 Content for Diwali 2017") +
+  xlab(label="Date") +
+  ylab(label="Average NO2 Content") +scale_x_date(date_labels="%b %y",date_breaks  ="1 month")
+
+ggplot(data = forecast, aes(x=ds, y=yhat))+geom_line(color='darkorange3') + ggtitle("Prediction of Delhi RSPM Content for Diwali 2017") +
+  xlab(label="Date") +
+  ylab(label="Average RSPM Content") +scale_x_date(date_labels="%b %y",date_breaks  ="1 month")
+
+
+```
+
+
+###Insight from Prediction
+
+Following points from the prediction plots
+- RSPM levels for the period October-December 2017 in Delhi is 6 times than the permissible limit which is very dangeous  
+- SPM levels are aso very high more than 6 times the limit  
+- NO2 levels for the period October-December 2017 in Delhi are relatively better are just above the limit
+- SO2 levels well within the permissible limits
